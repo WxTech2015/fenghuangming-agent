@@ -1,7 +1,5 @@
 # 凤凰鸣 Windows Agent
 
-公司：青州正宸电子科技有限公司 · 开发者：晚霞 · 协议：[MIT](LICENSE)
-
 这是凤凰鸣的独立播放端仓库。前后端在 [fenghuangming](https://github.com/WxTech2015/fenghuangming) 仓库维护，通信协议见 [后端 Agent 协议](https://github.com/WxTech2015/fenghuangming/blob/main/backend/docs/agent-protocol.md)。
 
 Windows 10/11 x64 使用发行包 `fenghuangming-agent-windows-x64-v0.1.4.zip`，解压即可。已内置运行时、mpv、NSSM 和桌面控制台，播放电脑无需安装 Node.js、npm 或其他组件。
