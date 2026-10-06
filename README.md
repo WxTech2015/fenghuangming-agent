@@ -1,5 +1,9 @@
 # 凤凰鸣 Windows Agent
 
+公司：青州正宸电子科技有限公司 · 开发者：晚霞 · 协议：[MIT](LICENSE)
+
+这是凤凰鸣的独立播放端仓库。前后端在 [fenghuangming](https://github.com/WxTech2015/fenghuangming) 仓库维护，通信协议见 [后端 Agent 协议](https://github.com/WxTech2015/fenghuangming/blob/main/backend/docs/agent-protocol.md)。
+
 Windows 10/11 x64 使用发行包 `fenghuangming-agent-windows-x64-v0.1.4.zip`，解压即可。已内置运行时、mpv、NSSM 和桌面控制台，播放电脑无需安装 Node.js、npm 或其他组件。
 
 ## 安装
@@ -80,7 +84,8 @@ Agent 主动连接服务器并下载音频，不需要公网 IP 或开放入站�
 仅开发电脑需要 Node.js 24+：
 
 ```powershell
-cd agent
+git clone https://github.com/WxTech2015/fenghuangming-agent.git
+cd fenghuangming-agent
 npm install --include=dev
 npm run typecheck
 npm test
@@ -91,3 +96,5 @@ npm run test:package
 Windows x64 构建使用 Node.js SEA，自动获取固定版本、经过校验的 mpv 和 NSSM，输出到 `release/`，附带校验和与第三方软件说明。打包工具不安装系统服务，`test:package` 使用本机临时测试服务器验证独立程序。
 
 源码运行可执行 `npm run build`、`npm start -- --config .\agent.config.json`，此方式需要自行填写已安装 mpv 的绝对路径。源码安装脚本仍支持 `-NodePath` 与 `-NssmPath`，发行版通过 `--install` 自动处理。
+
+本仓库单独安装依赖和构建，无需前后端源码。贡献说明见 [CONTRIBUTING](CONTRIBUTING.md)，第三方程序说明见 [THIRD_PARTY](THIRD_PARTY.md)，安全反馈见 [SECURITY](SECURITY.md)。
