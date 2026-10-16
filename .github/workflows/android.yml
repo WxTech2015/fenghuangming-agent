@@ -1,0 +1,48 @@
+name: android-checks
+
+on:
+  push:
+    paths: ['android/**', '.github/workflows/android.yml']
+  pull_request:
+    paths: ['android/**', '.github/workflows/android.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  daemon:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        working-directory: android/daemon
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.x'
+          cache-dependency-path: android/daemon/go.sum
+      - run: go test ./...
+      - run: go vet ./...
+
+  webui:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android/webui
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci --include=dev
+      - run: npm run build
+      - run: npm test

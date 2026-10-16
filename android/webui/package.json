@@ -1,0 +1,10 @@
+{
+  "name": "fenghuangming-android-webui",
+  "version": "0.2.0-android.1",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "vue-tsc --noEmit && vite build", "dev": "vite --host 127.0.0.1", "test": "vitest run" },
+  "dependencies": { "vue": "^3.5.22", "naive-ui": "^2.43.1" },
+  "allowScripts": { "esbuild@0.28.2": true },
+  "devDependencies": { "@vitejs/plugin-vue": "^6.0.1", "vite": "^7.1.9", "typescript": "~5.9.3", "vue-tsc": "^3.1.0", "vitest": "5.0.3", "fflate": "0.8.3" }
+}
