@@ -29,6 +29,11 @@ jobs:
           cache-dependency-path: android/daemon/go.sum
       - run: go test ./...
       - run: go vet ./...
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: node --test ../tests/module-launcher.test.cjs
 
   webui:
     runs-on: ubuntu-latest

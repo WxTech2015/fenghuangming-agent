@@ -3,14 +3,12 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -68,13 +66,17 @@ func lockDaemon(data string) (func(), error) {
 	if err := os.MkdirAll(data, 0700); err != nil {
 		return nil, err
 	}
-	file, err := os.OpenFile(filepath.Join(data, "daemon.lock"), os.O_CREATE|os.O_RDWR, 0600)
+	return lockFile(filepath.Join(data, "daemon.lock"))
+}
+
+func lockFile(path string) (func(), error) {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return nil, err
 	}
 	if err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		file.Close()
-		return nil, errors.New("守护进程已经启动")
+		return nil, errors.New("操作已经在运行")
 	}
 	return func() { _ = file.Close() }, nil
 }
@@ -136,14 +138,24 @@ func peerUID(connection *net.UnixConn) (uint32, error) {
 	}
 	return cred.Uid, nil
 }
-func commandOutput(program string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	bytes, err := exec.CommandContext(ctx, program, args...).CombinedOutput()
+func installPlayer(data, module string) error {
+	unlock, err := lockFile(filepath.Join(data, "player-install.lock"))
 	if err != nil {
-		return "", errors.New("Android 包管理器或服务启动失败")
+		return err
 	}
-	return string(bytes), nil
+	defer unlock()
+	if _, err := installedUID(module); err == nil {
+		fmt.Println("播放组件已安装，版本校验通过")
+		return nil
+	}
+	if err := streamPlayerAPK(module, runAndroidCommand); err != nil {
+		return err
+	}
+	if _, err := installedUID(module); err != nil {
+		return fmt.Errorf("安装后校验失败：%w", err)
+	}
+	fmt.Println("播放组件安装成功，版本与应用身份校验通过")
+	return nil
 }
 func installedUID(module string) (int, error) {
 	expected, err := hashFile(filepath.Join(module, "assets", "player.apk"))
@@ -191,7 +203,9 @@ func connectPlayer(module string) (playerConnection, error) {
 	name := fmt.Sprintf("@fenghuangming.player.v1.%d", uid)
 	connection, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: name, Net: "unix"})
 	if err != nil {
-		_, _ = commandOutput("/system/bin/am", "start-foreground-service", "--user", "0", "-n", packageName+"/.PlaybackService")
+		if _, startErr := commandOutput("/system/bin/am", "start-foreground-service", "--user", "0", "-n", packageName+"/.PlaybackService"); startErr != nil {
+			return nil, startErr
+		}
 		return nil, errors.New("原生服务尚未就绪，可在 WebUI 点击启动播放器")
 	}
 	peer, err := peerUID(connection)

@@ -13,8 +13,9 @@ func connectPlayer(string) (playerConnection, error) {
 func listenControl(string) (net.Listener, error) {
 	return nil, errors.New("控制 IPC 仅用于 Android / Linux")
 }
-func controlPeer(net.Conn) bool         { return false }
-func checkSpace(string, int64) error    { return nil }
-func activatePlayer() error             { return errors.New("仅用于 Android") }
-func stopPlayer() error                 { return errors.New("仅用于 Android") }
-func lockDaemon(string) (func(), error) { return func() {}, nil }
+func controlPeer(net.Conn) bool          { return false }
+func checkSpace(string, int64) error     { return nil }
+func activatePlayer() error              { return errors.New("仅用于 Android") }
+func stopPlayer() error                  { return errors.New("仅用于 Android") }
+func installPlayer(string, string) error { return errors.New("仅用于 Android") }
+func lockDaemon(string) (func(), error)  { return func() {}, nil }

@@ -1,7 +1,6 @@
 #!/system/bin/sh
 MODDIR=${0%/scripts/*}
 DATA=/data/adb/fenghuangming
-PKG=com.phoring.fenghuangming.player
 BIN="$MODDIR/bin/fhm-agent"
 rotate_log() {
   [ -f "$1" ] && [ ! -L "$1" ] || return 0
@@ -19,22 +18,12 @@ valid_pid() {
 }
 install_player() {
   [ "$(getprop sys.boot_completed)" = "1" ] || return 1
-  EXPECTED=$(cat "$MODDIR/assets/player.sha256")
-  ACTUAL=$(sha256sum "$MODDIR/assets/player.apk")
-  ACTUAL=${ACTUAL%% *}
-  [ "$ACTUAL" = "$EXPECTED" ] || { echo "播放 APK 校验失败"; return 1; }
-  INSTALLED=$(/system/bin/pm path --user 0 "$PKG")
-  case "$INSTALLED" in package:*/base.apk)
-    CURRENT=${INSTALLED#package:}
-    CURRENT_HASH=$(sha256sum "$CURRENT")
-    [ "${CURRENT_HASH%% *}" = "$EXPECTED" ] && return 0
-    ;;
-  esac
-  /system/bin/pm install -r --user 0 "$MODDIR/assets/player.apk"
+  "$BIN" --data "$DATA" --module "$MODDIR" --install-player
 }
 stop_agent() {
   if valid_pid; then kill -TERM "$PID"; fi
-  /system/bin/am force-stop --user 0 "$PKG" >/dev/null 2>&1
+  # CLI 的 Android 命令使用独立管道，避免把当前日志文件传给 Binder。
+  "$BIN" --stop-player >/dev/null 2>&1
 }
 case "$1" in
   supervise)
@@ -44,7 +33,7 @@ case "$1" in
       sleep 2; WAIT=$((WAIT+1))
     done
     [ "$(getprop sys.boot_completed)" = "1" ] || { echo "系统尚未就绪，停止自动启动"; exit 1; }
-    install_player || { echo "播放组件安装失败，请在 WebUI 查看日志"; exit 1; }
+    install_player || echo "播放组件安装失败；守护仍会启动，可在 WebUI 查看日志并重试安装"
     FAILURES=0
     while [ ! -f "$MODDIR/disable" ] && [ ! -f "$MODDIR/remove" ] && [ ! -f "$DATA/service.stopped" ]; do
       if valid_pid; then sleep 5; continue; fi
@@ -73,6 +62,10 @@ case "$1" in
     rotate_log "$DATA/launcher.log"
     "$0" supervise >> "$DATA/launcher.log" 2>&1 &
     ;;
-  install) install_player ;;
+  install)
+    rotate_log "$DATA/launcher.log"
+    install_player >> "$DATA/launcher.log" 2>&1 </dev/null &
+    echo "已提交播放组件安装，请在日志查看结果"
+    ;;
   *) echo "不支持的服务操作" >&2; exit 1 ;;
 esac

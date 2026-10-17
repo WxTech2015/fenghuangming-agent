@@ -31,6 +31,7 @@ func (a *Agent) playerLoop(ctx context.Context) {
 		}
 		player, err := connectPlayer(a.module)
 		if err != nil {
+			a.log("播放组件连接失败：" + err.Error())
 			a.mu.Lock()
 			a.playerError = err.Error()
 			a.playerFailures++
