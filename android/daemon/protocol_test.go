@@ -14,7 +14,6 @@ import (
 func TestWebSocketHandshakeCommandAndEventAck(t *testing.T) {
 	a := fixture(t)
 	a.welcomed = false
-	a.playerLocked = true
 	var socket *websocket.Conn
 	var socketMu sync.Mutex
 	ready := make(chan struct{})

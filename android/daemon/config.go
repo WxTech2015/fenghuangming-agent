@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-const version = "0.2.0-android.5"
+const version = "0.2.0-android.6"
 const packageName = "com.phoring.fenghuangming.player"
 const defaultData = "/data/adb/fenghuangming"
 
@@ -94,6 +94,8 @@ type PlayerState struct {
 	Output       string  `json:"output"`
 	SystemVolume int     `json:"systemVolume"`
 	Error        string  `json:"error,omitempty"`
+	CpuAwake     bool    `json:"cpuAwake"`
+	WifiLocked   bool    `json:"wifiLocked"`
 }
 type Payload struct {
 	Action      string   `json:"action"`

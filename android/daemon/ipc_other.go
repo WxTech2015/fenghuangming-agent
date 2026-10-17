@@ -7,7 +7,7 @@ import (
 	"net"
 )
 
-func connectPlayer(string) (playerConnection, error) {
+func connectPlayer(string, string) (playerConnection, error) {
 	return nil, errors.New("播放器 IPC 仅用于 Android / Linux")
 }
 func listenControl(string) (net.Listener, error) {
@@ -19,3 +19,4 @@ func activatePlayer() error              { return errors.New("仅用于 Android"
 func stopPlayer() error                  { return errors.New("仅用于 Android") }
 func installPlayer(string, string) error { return errors.New("仅用于 Android") }
 func lockDaemon(string) (func(), error)  { return func() {}, nil }
+func releaseKeepalive(string) error      { return nil }

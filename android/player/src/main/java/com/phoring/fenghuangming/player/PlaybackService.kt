@@ -8,10 +8,12 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.media.AudioManager
 import android.net.Uri
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
+import android.os.PowerManager
 import android.os.SystemClock
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -42,6 +44,8 @@ class PlaybackService : MediaSessionService() {
     private var foregroundReady = false
     private var lastError = ""
     private lateinit var incomingAudio: File
+    private var standbyWakeLock: PowerManager.WakeLock? = null
+    private var standbyWifiLock: WifiManager.WifiLock? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -98,6 +102,7 @@ class PlaybackService : MediaSessionService() {
             }
         }).build()
         postNotification()
+        acquireStandbyLocks()
         bridge = RootBridge({ message -> main.post { handle(message) } }, {
             main.post { gate.blocked = true; gate.leaseUntil = 0; stopCurrent("stopped") }
         })
@@ -113,6 +118,32 @@ class PlaybackService : MediaSessionService() {
         if (controllerInfo.isTrusted || controllerInfo.uid == android.os.Process.myUid()) session else null
 
     override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) { postNotification() }
+
+    // 点歌设备需要空闲待命；移除任务也不结束远程播放服务。
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        android.util.Log.i("FhmPlayer", "界面任务已移除，播放服务继续待命")
+        postNotification()
+    }
+
+    @Suppress("DEPRECATION", "WakelockTimeout")
+    private fun acquireStandbyLocks() {
+        try {
+            standbyWakeLock = getSystemService(PowerManager::class.java)
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "fenghuangming:standby").apply {
+                    setReferenceCounted(false)
+                    acquire()
+                }
+            standbyWifiLock = applicationContext.getSystemService(WifiManager::class.java)
+                .createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "fenghuangming:network").apply {
+                    setReferenceCounted(false)
+                    acquire()
+                }
+            android.util.Log.i("FhmPlayer", "已启用 CPU 与 Wi-Fi 待机保活")
+        } catch (error: Exception) {
+            lastError = "待机保活失败：${error.message.orEmpty()}".take(400)
+            android.util.Log.e("FhmPlayer", "待机保活失败", error)
+        }
+    }
 
     private fun postNotification() {
         if (!::player.isInitialized || destroyed) return
@@ -218,6 +249,7 @@ class PlaybackService : MediaSessionService() {
         val manager = getSystemService(AudioManager::class.java)
         val outputs = manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).joinToString(" / ") { it.productName.toString() }
         val state = JSONObject().put("ready", foregroundReady).put("playbackId", gate.playbackId ?: JSONObject.NULL)
+            .put("cpuAwake", standbyWakeLock?.isHeld == true).put("wifiLocked", standbyWifiLock?.isHeld == true)
             .put("started", started).put("position", player.currentPosition.coerceAtLeast(0) / 1000.0)
             .put("durationSeconds", duration() / 1000.0).put("seekable", player.isCurrentMediaItemSeekable)
             .put("paused", !player.playWhenReady).put("output", outputs).put("systemVolume", manager.getStreamVolume(AudioManager.STREAM_MUSIC)).put("error", lastError)
@@ -247,6 +279,8 @@ class PlaybackService : MediaSessionService() {
         foregroundReady = false
         publishLocalStatus(false)
         android.util.Log.i("FhmPlayer", "销毁原生播放服务")
+        standbyWifiLock?.let { if (it.isHeld) it.release() }
+        standbyWakeLock?.let { if (it.isHeld) it.release() }
         main.removeCallbacksAndMessages(null)
         stopCurrent("stopped")
         if (::bridge.isInitialized) bridge.close()

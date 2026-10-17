@@ -15,50 +15,54 @@ import (
 )
 
 func (a *Agent) playerLoop(ctx context.Context) {
-	delay := time.Second
-	for ctx.Err() == nil {
-		a.mu.Lock()
-		blocked := a.braked
-		locked := a.playerLocked
-		a.mu.Unlock()
-		if blocked || locked {
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(time.Second):
-				continue
-			}
+	a.maintainPlayer(ctx, func() (playerConnection, error) { return connectPlayer(a.data, a.module) }, time.Second)
+}
+
+func (a *Agent) maintainPlayer(ctx context.Context, connect func() (playerConnection, error), interval time.Duration) {
+	delay := interval
+	wait := func() bool {
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(delay):
+			return true
 		}
-		player, err := connectPlayer(a.module)
+	}
+	for ctx.Err() == nil {
+		player, err := connect()
 		if err != nil {
 			a.log("播放组件连接失败：" + err.Error())
 			a.mu.Lock()
 			a.playerError = err.Error()
-			a.playerFailures++
-			if a.playerFailures >= 5 {
-				a.playerLocked = true
-				a.playerError = "播放组件连续启动失败，已停止自动恢复，请点击启动播放器"
-			}
 			a.mu.Unlock()
-			select {
-			case <-ctx.Done():
+			if !wait() {
 				return
-			case <-time.After(delay):
 			}
-			delay = min(30*time.Second, delay*2)
+			delay = min(30*interval, delay*2)
 			continue
 		}
-		delay = time.Second
-		connectedAt := time.Now()
+		delay = interval
+		a.dispatchMu.Lock()
 		a.mu.Lock()
 		a.player = player
 		a.playerError = ""
 		a.playerSeen = time.Now()
 		epoch := a.epoch
 		lease := max(0, time.Until(a.leaseUntil).Milliseconds())
+		blocked := a.braked
 		a.mu.Unlock()
 		_ = player.Send(map[string]any{"type": "lease", "epoch": epoch, "leaseMs": lease}, "")
-		_ = player.Send(map[string]any{"action": "brake", "blocked": false}, "")
+		_ = player.Send(map[string]any{"action": "brake", "blocked": blocked}, "")
+		a.dispatchMu.Unlock()
+		a.log("原生播放服务已连接")
+		connectionDone := make(chan struct{})
+		go func() {
+			select {
+			case <-ctx.Done():
+				player.Close()
+			case <-connectionDone:
+			}
+		}()
 		reader := bufio.NewScanner(player)
 		reader.Buffer(make([]byte, 4096), 65536)
 		for reader.Scan() {
@@ -68,6 +72,7 @@ func (a *Agent) playerLoop(ctx context.Context) {
 			a.playerMessage(reader.Bytes())
 		}
 		player.Close()
+		close(connectionDone)
 		a.mu.Lock()
 		current := a.playerState.PlaybackID
 		if a.player == player {
@@ -75,17 +80,12 @@ func (a *Agent) playerLoop(ctx context.Context) {
 			a.playerState = PlayerState{}
 		}
 		a.playerError = "原生播放服务已断开"
-		if time.Since(connectedAt) >= 10*time.Minute {
-			a.playerFailures = 0
-		}
-		a.playerFailures++
-		if a.playerFailures >= 5 {
-			a.playerLocked = true
-			a.playerError = "播放组件反复退出，已停止自动恢复"
-		}
 		a.mu.Unlock()
 		if current != nil {
 			a.record(*current, "failed", "原生播放服务已断开")
+		}
+		if !wait() {
+			return
 		}
 	}
 }

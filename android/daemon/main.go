@@ -16,6 +16,7 @@ func main() {
 	showVersion := flag.Bool("version", false, "版本")
 	install := flag.Bool("install-player", false, "检查或安装本模块的播放 APK")
 	stop := flag.Bool("stop-player", false, "停止本模块的播放应用")
+	release := flag.Bool("release-keepalive", false, "移除本模块添加的播放器待机豁免")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println(version)
@@ -23,6 +24,13 @@ func main() {
 	}
 	if *stop {
 		if err := stopPlayer(); err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(1)
+		}
+		return
+	}
+	if *release {
+		if err := releaseKeepalive(*data); err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(1)
 		}

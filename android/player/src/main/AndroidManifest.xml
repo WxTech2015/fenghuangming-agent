@@ -4,10 +4,12 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <application android:label="凤凰鸣播放服务" android:allowBackup="false" android:usesCleartextTraffic="false" android:supportsRtl="true" android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity android:name=".BootstrapActivity" android:exported="true" android:excludeFromRecents="true" />
         <!-- 构建脚本检查真实字节码继承链；仅豁免 AGP 对 Media3 服务的继承解析误报。 -->
-        <service android:name=".PlaybackService" android:exported="true" android:foregroundServiceType="mediaPlayback|specialUse" tools:ignore="Instantiatable">
+        <service android:name=".PlaybackService" android:exported="true" android:stopWithTask="false" android:foregroundServiceType="mediaPlayback|specialUse" tools:ignore="Instantiatable">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-enabled remote music player standby with visible service status and local stop controls" />
             <intent-filter><action android:name="androidx.media3.session.MediaSessionService" /></intent-filter>
         </service>

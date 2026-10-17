@@ -195,10 +195,47 @@ func installedUID(module string) (int, error) {
 	}
 	return uid, nil
 }
-func connectPlayer(module string) (playerConnection, error) {
+
+// 只豁免本项目的播放器；原有白名单不归模块所有，卸载时不删除。
+func ensurePlayerKeepalive(data string) error {
+	output, err := commandOutput("/system/bin/dumpsys", "deviceidle", "whitelist")
+	if err != nil {
+		return err
+	}
+	for _, line := range strings.Split(output, "\n") {
+		parts := strings.Split(strings.TrimSpace(line), ",")
+		if len(parts) >= 2 && parts[1] == packageName {
+			return nil
+		}
+	}
+	marker := filepath.Join(data, "keepalive-whitelist.added")
+	if err := atomicJSON(marker, map[string]bool{"added": true}); err != nil {
+		return err
+	}
+	_, err = commandOutput("/system/bin/dumpsys", "deviceidle", "whitelist", "+"+packageName)
+	return err
+}
+
+func releaseKeepalive(data string) error {
+	marker := filepath.Join(data, "keepalive-whitelist.added")
+	if _, err := os.Stat(marker); os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	if _, err := commandOutput("/system/bin/dumpsys", "deviceidle", "whitelist", "-"+packageName); err != nil {
+		return err
+	}
+	return os.Remove(marker)
+}
+
+func connectPlayer(data, module string) (playerConnection, error) {
 	uid, err := installedUID(module)
 	if err != nil {
 		return nil, err
+	}
+	if err := ensurePlayerKeepalive(data); err != nil {
+		return nil, fmt.Errorf("无法设置播放器待机白名单：%w", err)
 	}
 	name := fmt.Sprintf("@fenghuangming.player.v1.%d", uid)
 	connection, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: name, Net: "unix"})

@@ -2,7 +2,7 @@
 
 这是凤凰鸣的独立播放端仓库。前后端在 [fenghuangming](https://github.com/WxTech2015/fenghuangming) 仓库维护，通信协议见 [后端 Agent 协议](https://github.com/WxTech2015/fenghuangming/blob/main/backend/docs/agent-protocol.md)。
 
-Android 10+ ARM64 的 SukiSU / KernelSU 模块位于 [android](android/README.md)，使用原生 Media3 播放和模块 WebUI。当前为 `0.2.0-android.5` 测试预览；已用 x86_64 测试包完成 MuMu 中的真实 KernelSU 安装、重启自启和 WebUI 控制，ARM64 手机仍未实测。以下为 Windows 安装说明。
+Android 10+ ARM64 的 SukiSU / KernelSU 模块位于 [android](android/README.md)，使用原生 Media3 播放和模块 WebUI。当前为 `0.2.0-android.6` 测试预览；已用 x86_64 测试包完成 MuMu 中的真实 KernelSU 安装、重启、后台播放与进程恢复验证，ARM64 手机仍未实测。以下为 Windows 安装说明。
 
 Windows 10/11 x64 使用发行包 `fenghuangming-agent-windows-x64-v0.1.4.zip`，解压即可。已内置运行时、mpv、NSSM 和桌面控制台，播放电脑无需安装 Node.js、npm 或其他组件。
 

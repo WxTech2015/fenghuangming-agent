@@ -40,8 +40,6 @@ type Agent struct {
 	playerState     PlayerState
 	playerSeen      time.Time
 	playerError     string
-	playerFailures  int
-	playerLocked    bool
 	cancelDownload  context.CancelFunc
 	generation      uint64
 	current         *Payload
@@ -721,10 +719,6 @@ func (a *Agent) control(input map[string]json.RawMessage) (any, error) {
 		}
 		return map[string]bool{"ok": true}, nil
 	case "activate":
-		a.mu.Lock()
-		a.playerLocked = false
-		a.playerFailures = 0
-		a.mu.Unlock()
 		return map[string]bool{"ok": true}, activatePlayer()
 	case "pause", "resume", "stop", "seek", "volume":
 		var value float64
