@@ -29,6 +29,10 @@ stop_agent() {
 }
 case "$1" in
   supervise)
+    # KernelSU 可能重复触发开机钩子；只保留一个监控进程。
+    exec /data/adb/ksu/bin/busybox flock -n "$DATA/supervisor.lock" "$0" supervise-locked
+    ;;
+  supervise-locked)
     WAIT=0
     while [ "$(getprop sys.boot_completed)" != "1" ] && [ "$WAIT" -lt 60 ]; do
       [ -f "$MODDIR/disable" ] && exit 0
