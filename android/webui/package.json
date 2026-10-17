@@ -1,6 +1,6 @@
 {
   "name": "fenghuangming-android-webui",
-  "version": "0.2.0-android.3",
+  "version": "0.2.0-android.4",
   "private": true,
   "type": "module",
   "scripts": { "build": "vue-tsc --noEmit && vite build", "dev": "vite --host 127.0.0.1", "test": "vitest run" },

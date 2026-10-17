@@ -45,6 +45,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
+        android.util.Log.i("FhmPlayer", "创建原生播放服务")
         val directory = File(cacheDir, "fenghuangming")
         check(directory.mkdirs() || directory.isDirectory)
         android.system.Os.chmod(directory.absolutePath, 448)
@@ -69,6 +70,7 @@ class PlaybackService : MediaSessionService() {
                     status()
                 }
                 override fun onPlayerError(error: PlaybackException) {
+                    android.util.Log.e("FhmPlayer", "原生播放失败：${error.errorCodeName}", error)
                     lastError = error.errorCodeName
                     stopCurrent("failed", error.errorCodeName)
                 }
@@ -126,7 +128,11 @@ class PlaybackService : MediaSessionService() {
             else ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
             startForeground(2001, notification, type)
             foregroundReady = true
-        } catch (error: Exception) { foregroundReady = false; lastError = error.javaClass.simpleName }
+        } catch (error: Exception) {
+            foregroundReady = false
+            lastError = "${error.javaClass.simpleName}: ${error.message.orEmpty()}".take(400)
+            android.util.Log.e("FhmPlayer", "前台服务启动失败", error)
+        }
     }
     private fun handle(message: JSONObject) {
         if (destroyed) return
@@ -215,7 +221,17 @@ class PlaybackService : MediaSessionService() {
             .put("started", started).put("position", player.currentPosition.coerceAtLeast(0) / 1000.0)
             .put("durationSeconds", duration() / 1000.0).put("seekable", player.isCurrentMediaItemSeekable)
             .put("paused", !player.playWhenReady).put("output", outputs).put("systemVolume", manager.getStreamVolume(AudioManager.STREAM_MUSIC)).put("error", lastError)
+        publishLocalStatus(foregroundReady)
         bridge.send(JSONObject().put("type", "status").put("state", state))
+    }
+    private fun publishLocalStatus(ready: Boolean) {
+        try {
+            val file = File(filesDir, "player-status.json")
+            val temporary = File(filesDir, "player-status.tmp")
+            temporary.writeText(JSONObject().put("ready", ready).put("blocked", gate.blocked)
+                .put("updatedElapsed", SystemClock.elapsedRealtime()).put("error", lastError).toString())
+            if (!temporary.renameTo(file)) temporary.delete()
+        } catch (error: Exception) { android.util.Log.w("FhmPlayer", "无法保存本机服务状态", error) }
     }
     private val tick = object : Runnable {
         override fun run() {
@@ -228,6 +244,9 @@ class PlaybackService : MediaSessionService() {
     }
     override fun onDestroy() {
         destroyed = true
+        foregroundReady = false
+        publishLocalStatus(false)
+        android.util.Log.i("FhmPlayer", "销毁原生播放服务")
         main.removeCallbacksAndMessages(null)
         stopCurrent("stopped")
         if (::bridge.isInitialized) bridge.close()
