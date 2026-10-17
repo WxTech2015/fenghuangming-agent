@@ -1,6 +1,6 @@
 id=fenghuangming_agent
 name=凤凰鸣 Android Agent
-version=0.2.0-android.2
-versionCode=20002
+version=0.2.0-android.3
+versionCode=20003
 author=晚霞
 description=QQ 群点歌播放端，内置原生播放服务与模块 WebUI，Android 10+ ARM64。

@@ -8,8 +8,8 @@ android {
         applicationId = "com.phoring.fenghuangming.player"
         minSdk = 29
         targetSdk = 36
-        versionCode = 20002
-        versionName = "0.2.0-android.2"
+        versionCode = 20003
+        versionName = "0.2.0-android.3"
     }
     signingConfigs {
         create("module") {

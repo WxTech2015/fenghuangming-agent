@@ -18,6 +18,8 @@ valid_pid() {
 }
 install_player() {
   [ "$(getprop sys.boot_completed)" = "1" ] || return 1
+  AGENT_VERSION=$("$BIN" --version)
+  echo "$(date +%Y-%m-%dT%H:%M:%S%z) [$AGENT_VERSION] 检查播放组件"
   "$BIN" --data "$DATA" --module "$MODDIR" --install-player
 }
 stop_agent() {

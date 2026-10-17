@@ -1,6 +1,6 @@
 # Android 预览版验证记录
 
-日期：2026-10-17。版本：`0.2.0-android.2`。
+日期：2026-10-17。版本：`0.2.0-android.3`。
 
 ## 开发机检查
 
@@ -19,11 +19,15 @@ Go 测试在 Windows 运行，验证平台无关的协议和逻辑；Android 本
 
 AGP 的 `Instantiatable` 检查对本项目 Media3 服务产生继承链误报，仅在该服务声明上作了局部豁免。构建脚本用 `javap` 核对真实类文件：`PlaybackService → MediaSessionService → android.app.Service`，并检查公开无参构造函数。其他 Lint 检查保留。
 
-## android.2 安装修复
+## 安装问题修复
 
-用户截图中的包管理器返回 `Failed transaction (2147483646)`，旧启动脚本随后退出。新安装流程通过 Go 创建独立管道，以 `pm install -S <字节数> -` 接收 APK，不把 `/data/adb` 中的日志或 APK 文件描述符传给 Binder。安装前核对模块 APK 的 SHA-256，安装后仍检查实际 APK 哈希和应用 UID；失败不阻止守护启动，重复安装由进程锁拦截。
+最初的手机日志中包管理器返回 `Failed transaction (2147483646)`，旧启动脚本随后退出。android.2 改用 Go 管道传输后，手机已进入包管理器安装逻辑，但末尾的 `-` 被当成未知选项，安装仍失败。
+
+android.3 将命令修正为 `pm install -r --user 0 -S <字节数>`，省略 APK 路径，从标准输入读取。已核对 [Android 10](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android10-release/services/core/java/com/android/server/pm/PackageManagerShellCommand.java) 与 [Android 14](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android14-release/services/core/java/com/android/server/pm/PackageManagerShellCommand.java) 的安装和标准输入处理代码。命令继续使用独立管道，不把 `/data/adb` 中的日志或 APK 文件描述符传给 Binder。安装前后继续校验 APK 和应用 UID；失败不阻止守护启动，重复安装由进程锁拦截。
 
 补充检查覆盖流式安装参数、字节完整性、损坏 APK 拦截、具体安装错误保留、输出上限与进程超时，以及安装失败后仍启动守护的 Shell 回归。Linux 另检查命令子进程接收的三个标准流确实是管道。开发机完成 Windows 用例及 Android 交叉编译，Linux 用例由 GitHub Actions 执行；目标手机上的实际安装结果仍待更新后确认。
+
+本次先按 Android 选项规则复现旧命令的 `Unknown option -`，修正后相同用例通过。该检查验证命令契约，不等同于手机实际安装。
 
 ## 未完成的手机验收
 

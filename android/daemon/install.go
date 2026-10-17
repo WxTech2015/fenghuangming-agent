@@ -35,7 +35,8 @@ func streamPlayerAPK(module string, run androidRunner) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	output, err := run(ctx, file, "/system/bin/pm", "install", "-r", "--user", "0", "-S", strconv.FormatInt(info.Size(), 10), "-")
+	// 提供大小并省略路径即可从标准输入安装；末尾的 "-" 会被部分系统当作未知选项。
+	output, err := run(ctx, file, "/system/bin/pm", "install", "-r", "--user", "0", "-S", strconv.FormatInt(info.Size(), 10))
 	if err != nil {
 		return fmt.Errorf("播放组件安装失败：%w", err)
 	}

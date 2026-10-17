@@ -6,13 +6,47 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
+
+// 按 Android Shell 的选项规则检查外部接口；单独的 "-" 会被当作未知选项。
+// APK 路径省略且提供 -S 时，Android 10 / 14 的包管理器均从标准输入读取。
+func checkInstallOptions(args []string, size int) error {
+	if len(args) == 0 || args[0] != "install" {
+		return errors.New("expected install command")
+	}
+	var replace bool
+	var user, declared string
+	for i := 1; i < len(args); i++ {
+		switch args[i] {
+		case "-r":
+			replace = true
+		case "--user", "-S":
+			option := args[i]
+			i++
+			if i == len(args) {
+				return errors.New("missing option value")
+			}
+			if option == "--user" {
+				user = args[i]
+			} else {
+				declared = args[i]
+			}
+		default:
+			return fmt.Errorf("Unknown option %s", args[i])
+		}
+	}
+	if !replace || user != "0" || declared != strconv.Itoa(size) {
+		return errors.New("missing replacement, user or stream size")
+	}
+	return nil
+}
 
 func TestPlayerInstallStream(t *testing.T) {
 	module := t.TempDir()
@@ -39,8 +73,11 @@ func TestPlayerInstallStream(t *testing.T) {
 	} {
 		t.Run(result.name, func(t *testing.T) {
 			err := streamPlayerAPK(module, func(ctx context.Context, input io.Reader, program string, args ...string) (string, error) {
-				if program != "/system/bin/pm" || !reflect.DeepEqual(args, []string{"install", "-r", "--user", "0", "-S", "1600", "-"}) {
-					t.Fatalf("unsafe install arguments: %s %v", program, args)
+				if program != "/system/bin/pm" {
+					t.Fatalf("unexpected program: %s", program)
+				}
+				if err := checkInstallOptions(args, len(apk)); err != nil {
+					return "", err
 				}
 				payload, err := io.ReadAll(input)
 				if err != nil || !bytes.Equal(payload, apk) {

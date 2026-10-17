@@ -18,6 +18,7 @@ test('安装失败后仍启动守护并保留诊断', async () => {
     await fs.writeFile(path.join(root, 'bin/sleep'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
     await fs.writeFile(path.join(module, 'bin/fhm-agent'), `#!/bin/sh
 case " $* " in
+  *" --version "*) echo 'test-version'; exit 0;;
   *" --install-player "*) echo 'Failure [INSTALL_FAILED_TEST]' >&2; exit 1;;
   *" --stop-player "*) exit 0;;
 esac

@@ -4,7 +4,7 @@ const { createHash } = require('node:crypto');
 const { zipSync, unzipSync } = require('../webui/node_modules/fflate');
 const root = path.resolve(__dirname, '..');
 const release = path.resolve(root, '../release/android');
-const version = '0.2.0-android.2';
+const version = '0.2.0-android.3';
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 async function walk(directory, prefix = '') {
   const files = [];
