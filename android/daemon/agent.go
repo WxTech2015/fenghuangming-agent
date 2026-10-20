@@ -22,39 +22,43 @@ type Player interface {
 	Close() error
 }
 type Agent struct {
-	mu              sync.Mutex
-	wsMu            sync.Mutex
-	brakeMu         sync.Mutex
-	dispatchMu      sync.Mutex
-	cancelMain      context.CancelFunc
-	data, module    string
-	config          Config
-	journal         Journal
-	braked          bool
-	socket          *websocket.Conn
-	welcomed        bool
-	agentID, zoneID string
-	epoch           int64
-	leaseUntil      time.Time
-	player          Player
-	playerState     PlayerState
-	playerSeen      time.Time
-	playerError     string
-	cancelDownload  context.CancelFunc
-	generation      uint64
-	current         *Payload
-	transfer        *Transfer
-	overview        json.RawMessage
-	bootID          string
-	pending         map[string]chan error
-	logs            []string
+	mu                   sync.Mutex
+	wsMu                 sync.Mutex
+	brakeMu              sync.Mutex
+	dispatchMu           sync.Mutex
+	cancelMain           context.CancelFunc
+	data, module         string
+	config               Config
+	journal              Journal
+	braked               bool
+	socket               *websocket.Conn
+	welcomed             bool
+	agentID, zoneID      string
+	epoch                int64
+	leaseUntil           time.Time
+	player               Player
+	playerState          PlayerState
+	playerSeen           time.Time
+	playerError          string
+	playerKeepaliveError string
+	playerConnections    uint64
+	playerDisconnectedAt string
+	startedAt            time.Time
+	cancelDownload       context.CancelFunc
+	generation           uint64
+	current              *Payload
+	transfer             *Transfer
+	overview             json.RawMessage
+	bootID               string
+	pending              map[string]chan error
+	logs                 []string
 }
 
 func newAgent(data, module string) (*Agent, error) {
 	if err := os.MkdirAll(data, 0700); err != nil {
 		return nil, err
 	}
-	a := &Agent{data: data, module: module, config: Config{CacheMaxMB: 512, Connections: 4}, bootID: newID(), pending: make(map[string]chan error)}
+	a := &Agent{data: data, module: module, config: Config{CacheMaxMB: 512, Connections: 4}, bootID: newID(), pending: make(map[string]chan error), startedAt: time.Now()}
 	stalePattern := regexp.MustCompile(`^[a-f0-9]{64}\.[a-f0-9]{32}\.tmp$`)
 	if cached, err := os.ReadDir(filepath.Join(data, "cache")); err == nil {
 		for _, item := range cached {
@@ -105,7 +109,11 @@ func (a *Agent) state() map[string]any {
 	if a.current != nil {
 		current = map[string]any{"title": a.current.Title, "artists": a.current.Artists, "playbackId": a.current.PlaybackID}
 	}
-	return map[string]any{"version": version, "endpoint": a.config.ServerURL, "hasToken": a.config.Token != "", "authorized": a.welcomed, "serverConnected": a.socket != nil, "playerConnected": a.player != nil && time.Since(a.playerSeen) < 6*time.Second, "playerReady": a.readyLocked(), "playerError": a.playerError, "emergencyStopped": a.braked, "player": a.playerState, "current": current, "transfer": a.transfer, "overview": a.overview, "cacheMaxMb": a.config.CacheMaxMB, "connections": a.config.Connections}
+	diagnostics := map[string]any{"daemonPid": os.Getpid(), "uptimeSeconds": int64(time.Since(a.startedAt).Seconds()), "playerConnections": a.playerConnections, "lastPlayerDisconnect": a.playerDisconnectedAt, "keepaliveError": a.playerKeepaliveError}
+	if native, ok := a.player.(interface{ PID() int }); ok {
+		diagnostics["playerPid"] = native.PID()
+	}
+	return map[string]any{"version": version, "endpoint": a.config.ServerURL, "hasToken": a.config.Token != "", "authorized": a.welcomed, "serverConnected": a.socket != nil, "playerConnected": a.player != nil && time.Since(a.playerSeen) < 6*time.Second, "playerReady": a.readyLocked(), "playerError": a.playerError, "emergencyStopped": a.braked, "player": a.playerState, "current": current, "transfer": a.transfer, "overview": a.overview, "cacheMaxMb": a.config.CacheMaxMB, "connections": a.config.Connections, "diagnostics": diagnostics}
 }
 func (a *Agent) wire(kind string) map[string]any {
 	a.mu.Lock()
@@ -185,7 +193,7 @@ func (a *Agent) run(ctx context.Context) {
 				return
 			case <-time.After(delay):
 			}
-			delay = min(30*time.Second, delay*2)
+			delay = min(5*time.Second, delay*2)
 			continue
 		}
 		delay = time.Second
@@ -208,6 +216,9 @@ func (a *Agent) run(ctx context.Context) {
 			}
 		}
 		socket.Close()
+		if ctx.Err() == nil {
+			a.log("后端连接已断开，正在重连；本机播放器监控继续运行")
+		}
 		a.mu.Lock()
 		if a.socket == socket {
 			a.socket = nil
@@ -597,6 +608,9 @@ func (a *Agent) tick(ctx context.Context) {
 			_ = player.Send(map[string]any{"type": "lease", "epoch": epoch, "leaseMs": max(0, lease.Milliseconds())}, "")
 		}
 		counter++
+		if player != nil && counter%3 == 0 {
+			a.protectPlayer(player)
+		}
 		if counter%5 == 0 {
 			a.send(a.wire("heartbeat"))
 			for _, e := range events {

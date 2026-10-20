@@ -37,7 +37,7 @@ async function until(label, predicate, timeout = 15000) { const start = Date.now
 function wav() { const rate = 48000, seconds = 35, bytes = rate * seconds * 2, b = Buffer.alloc(bytes + 44); b.write('RIFF'); b.writeUInt32LE(bytes + 36, 4); b.write('WAVEfmt ', 8); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22); b.writeUInt32LE(rate, 24); b.writeUInt32LE(rate * 2, 28); b.writeUInt16LE(2, 32); b.writeUInt16LE(16, 34); b.write('data', 36); b.writeUInt32LE(bytes, 40); for (let i = 0; i < rate * seconds; i++)
     b.writeInt16LE(Math.round(120 * Math.sin(2 * Math.PI * 440 * i / rate)), 44 + i * 2); return b; }
 const audio = wav(), digest = crypto.createHash('sha256').update(audio).digest('hex');
-let ws, leaseTimer, daemonPid, server, renew = true;
+let ws, leaseTimer, daemonPid, server, renew = true, acceptConnections = true, originalWifi;
 let commandId = 0;
 function command(payload) { ws.send(JSON.stringify({ v: 1, kind: 'command', id: 'smoke_' + (++commandId), agentId: 'emulator', zoneId: 'test', epoch: 1, expiresAt: new Date(Date.now() + 30000).toISOString(), payload })); }
 async function main() {
@@ -61,7 +61,7 @@ async function main() {
         res.end(audio);
     } });
     const wss = new WebSocketServer({ server, path: '/ws/agents' });
-    wss.on('connection', (socket, req) => { if (req.headers.authorization !== 'Bearer ' + token) {
+    wss.on('connection', (socket, req) => { if (!acceptConnections || req.headers.authorization !== 'Bearer ' + token) {
         socket.close();
         return;
     } ws = socket; socket.on('message', raw => { const value = JSON.parse(raw); report.messages.push(value); if (value.type === 'hello')
@@ -122,6 +122,50 @@ async function main() {
     await until('second native playback started', () => report.messages.some(v => v.type === 'playback' && v.playbackId === 'lease_play' && v.state === 'started'));
     renew = false;
     await until('expired lease stops playback', () => { const p = ctl({ action: 'state' }).player; return !p?.playbackId; }, 10000);
+    if (options.get('--network-recovery') === 'yes') {
+        if (call('shell', 'getprop', 'ro.kernel.qemu') !== '1') throw Error('断网恢复测试只允许隔离模拟器');
+        originalWifi = shell('settings get global wifi_on');
+        report.networkRecovery = { recoveries: [] };
+        ctl({ action: 'brake' });
+        const before = ctl({ action: 'state' });
+        const initialPlayer = before.diagnostics.playerPid;
+        const daemon = before.diagnostics.daemonPid;
+        shell('svc wifi disable');
+        await until('Wi-Fi is actually disabled', () => shell('settings get global wifi_on') === '0');
+        // ADB reverse 不随 Wi-Fi 断开，额外拒绝测试后端连接以模拟真实网络中断。
+        acceptConnections = false;
+        ws.terminate();
+        await until('backend offline with native standby alive', () => {
+            const s = ctl({ action: 'state' });
+            return !s.authorized && s.playerConnected && s.player.cpuAwake && s.diagnostics.daemonPid === daemon;
+        });
+        await sleep(6000);
+        const offline = ctl({ action: 'state' });
+        if (offline.authorized || !offline.playerConnected || offline.diagnostics.playerPid !== initialPlayer) throw Error('断网导致原生待机退出');
+        report.steps.push('native PID survives Wi-Fi disconnect and expired backend lease');
+        for (let round = 1; round <= 3; round++) {
+            const pid = ctl({ action: 'state' }).diagnostics.playerPid;
+            const start = Date.now();
+            shell('am force-stop --user 0 ' + pkg);
+            await until('offline native recovery ' + round, () => {
+                const s = ctl({ action: 'state' });
+                return !s.authorized && s.playerConnected && s.player.ready && s.player.cpuAwake && s.emergencyStopped &&
+                    s.diagnostics.playerPid !== pid && s.diagnostics.daemonPid === daemon;
+            }, 12000);
+            const s = ctl({ action: 'state' });
+            report.networkRecovery.recoveries.push({ millis: Date.now() - start, before: pid, after: s.diagnostics.playerPid });
+            const adj = Number(shell('cat /proc/' + s.diagnostics.playerPid + '/oom_score_adj'));
+            if (adj > -700 || s.diagnostics.keepaliveError) throw Error('Root 播放进程保护没有生效');
+        }
+        acceptConnections = true;
+        renew = true;
+        shell('svc wifi enable');
+        await until('network returns without manual activation', () => {
+            const s = ctl({ action: 'state' });
+            return s.authorized && s.playerConnected && s.emergencyStopped && s.diagnostics.daemonPid === daemon;
+        });
+        report.networkRecovery.final = ctl({ action: 'state' });
+    }
     report.crash = call('logcat', '-d', '-b', 'crash', '-t', '120');
     if (report.crash.includes(pkg))
         throw Error('player crash buffer is not empty');
@@ -134,6 +178,7 @@ main().catch(error => { report.success = false; report.error = error.message; co
     console.error(report.logs, report.crash);
 }
 catch { } }).finally(async () => { try {
+    if (originalWifi !== undefined) shell('svc wifi ' + (originalWifi === '0' ? 'disable' : 'enable'));
     ctl({ action: 'brake' });
     if (/^\d+$/.test(daemonPid || '') && shell('readlink /proc/' + daemonPid + '/exe') === dir + '/fhm-agent')
         shell('kill -TERM ' + daemonPid);

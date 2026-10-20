@@ -6,7 +6,7 @@
 
 ```sh
 su
-sh /sdcard/Download/fenghuangming-agent-android9-arm64-0.2.0-android9.2.sh
+sh /sdcard/Download/fenghuangming-agent-android9-arm64-0.2.0-android9.3.sh
 sh /data/adb/fenghuangming/standalone/fhm.sh open
 ```
 

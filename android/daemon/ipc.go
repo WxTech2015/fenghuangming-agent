@@ -38,7 +38,7 @@ func (a *Agent) maintainPlayer(ctx context.Context, connect func() (playerConnec
 			if !wait() {
 				return
 			}
-			delay = min(30*interval, delay*2)
+			delay = min(3*interval, delay*2)
 			continue
 		}
 		delay = interval
@@ -47,6 +47,7 @@ func (a *Agent) maintainPlayer(ctx context.Context, connect func() (playerConnec
 		a.player = player
 		a.playerError = ""
 		a.playerSeen = time.Now()
+		a.playerConnections++
 		epoch := a.epoch
 		lease := max(0, time.Until(a.leaseUntil).Milliseconds())
 		blocked := a.braked
@@ -55,6 +56,7 @@ func (a *Agent) maintainPlayer(ctx context.Context, connect func() (playerConnec
 		_ = player.Send(map[string]any{"action": "brake", "blocked": blocked}, "")
 		a.dispatchMu.Unlock()
 		a.log("原生播放服务已连接")
+		a.protectPlayer(player)
 		connectionDone := make(chan struct{})
 		go func() {
 			select {
@@ -80,7 +82,22 @@ func (a *Agent) maintainPlayer(ctx context.Context, connect func() (playerConnec
 			a.playerState = PlayerState{}
 		}
 		a.playerError = "原生播放服务已断开"
+		a.playerDisconnectedAt = time.Now().Format(time.RFC3339)
 		a.mu.Unlock()
+		if ctx.Err() == nil {
+			reason := "本机连接已关闭"
+			if reader.Err() != nil {
+				reason = reader.Err().Error()
+			}
+			a.log("原生播放服务断开：" + reason + "；守护继续运行，1 秒后重新拉起")
+			if diagnostics, ok := player.(interface{ DisconnectLog() string }); ok {
+				go func() {
+					if message := diagnostics.DisconnectLog(); message != "" {
+						a.log(message)
+					}
+				}()
+			}
+		}
 		if current != nil {
 			a.record(*current, "failed", "原生播放服务已断开")
 		}
@@ -93,6 +110,33 @@ func (a *Agent) maintainPlayer(ctx context.Context, connect func() (playerConnec
 type playerConnection interface {
 	Player
 	io.Reader
+}
+
+// 播放器的本机连接与后端网络分别恢复；断网不暂停原生服务的监控。
+func (a *Agent) protectPlayer(player Player) {
+	guard, ok := player.(interface{ KeepAlive() error })
+	if !ok {
+		return
+	}
+	err := guard.KeepAlive()
+	warning := ""
+	if err != nil {
+		warning = err.Error()
+	}
+	a.mu.Lock()
+	if a.player != player {
+		a.mu.Unlock()
+		return
+	}
+	previous := a.playerKeepaliveError
+	a.playerKeepaliveError = warning
+	a.mu.Unlock()
+	if warning != "" && warning != previous {
+		a.log("播放器保活设置未完全生效：" + warning + "；仍持续监控和拉起播放器")
+	}
+	if warning == "" && previous != "" {
+		a.log("播放器保活设置已恢复")
+	}
 }
 
 func serveControl(ctx context.Context, a *Agent) error {

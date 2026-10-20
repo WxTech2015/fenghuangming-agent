@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-var version = "0.2.0-android.6"
+var version = "0.2.0-android.7"
 const packageName = "com.phoring.fenghuangming.player"
 const defaultData = "/data/adb/fenghuangming"
 

@@ -2,7 +2,7 @@
 
 这是凤凰鸣的独立播放端仓库。前后端在 [fenghuangming](https://github.com/WxTech2015/fenghuangming) 仓库维护，通信协议见 [后端 Agent 协议](https://github.com/WxTech2015/fenghuangming/blob/main/backend/docs/agent-protocol.md)。
 
-Android 10+ ARM64 的 SukiSU / KernelSU 模块位于 [android](android/README.md)，使用原生 Media3 播放和模块 WebUI。当前为 `0.2.0-android.6` 测试预览；已用 x86_64 测试包完成 MuMu 中的真实 KernelSU 安装、重启、后台播放与进程恢复验证，ARM64 手机仍未实测。以下为 Windows 安装说明。
+Android 10+ ARM64 的 SukiSU / KernelSU 模块位于 [android](android/README.md)，使用原生 Media3 播放和模块 WebUI。当前为 `0.2.0-android.7` 测试预览，Android 9 兼容版为 `0.2.0-android9.3`；增加原生进程保护、离线恢复和诊断信息。已有版本完成 MuMu 真实 KernelSU 模块安装及后台播放测试，本次在 AOSP Android 9 验证断网和连续回收播放器后的恢复，ARM64 手机仍未实测。以下为 Windows 安装说明。
 
 EMUI 9 / Android 9 另有 [Android 9 兼容版](android/ANDROID9.md)，使用 API 28 播放器和守护、旧 WebView 兼容构建，产物与常规版分开保存。
 

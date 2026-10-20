@@ -20,8 +20,10 @@ import (
 
 type nativePlayer struct {
 	*net.UnixConn
-	mu  sync.Mutex
-	uid uint32
+	mu               sync.Mutex
+	uid              uint32
+	pid              int
+	keepaliveWarning error
 }
 
 // 文件由 APK 创建，保留其应用 UID 与 SELinux 标签；Root 只填充已有缓冲文件。
@@ -121,9 +123,16 @@ func (p *nativePlayer) Send(value map[string]any, file string) error {
 	return err
 }
 func peerUID(connection *net.UnixConn) (uint32, error) {
-	raw, err := connection.SyscallConn()
+	cred, err := peerCredentials(connection)
 	if err != nil {
 		return 0, err
+	}
+	return cred.Uid, nil
+}
+func peerCredentials(connection *net.UnixConn) (*syscall.Ucred, error) {
+	raw, err := connection.SyscallConn()
+	if err != nil {
+		return nil, err
 	}
 	var cred *syscall.Ucred
 	var inner error
@@ -131,12 +140,12 @@ func peerUID(connection *net.UnixConn) (uint32, error) {
 		cred, inner = syscall.GetsockoptUcred(int(fd), syscall.SOL_SOCKET, syscall.SO_PEERCRED)
 	})
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	if inner != nil {
-		return 0, inner
+		return nil, inner
 	}
-	return cred.Uid, nil
+	return cred, nil
 }
 func installPlayer(data, module string) error {
 	unlock, err := lockFile(filepath.Join(data, "player-install.lock"))
@@ -234,23 +243,87 @@ func connectPlayer(data, module string) (playerConnection, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := ensurePlayerKeepalive(data); err != nil {
-		return nil, fmt.Errorf("无法设置播放器待机白名单：%w", err)
-	}
 	name := fmt.Sprintf("@fenghuangming.player.v1.%d", uid)
 	connection, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: name, Net: "unix"})
 	if err != nil {
 		if _, startErr := commandOutput("/system/bin/am", "start-foreground-service", "--user", "0", "-n", packageName+"/.PlaybackService"); startErr != nil {
 			return nil, startErr
 		}
-		return nil, errors.New("原生服务尚未就绪，可在 WebUI 点击启动播放器")
+		return nil, errors.New("已请求启动原生服务，正在等待本机连接")
 	}
-	peer, err := peerUID(connection)
-	if err != nil || int(peer) != uid {
+	peer, err := peerCredentials(connection)
+	if err != nil || int(peer.Uid) != uid || peer.Pid <= 1 {
 		connection.Close()
 		return nil, errors.New("拒绝未知本机播放器")
 	}
-	return &nativePlayer{UnixConn: connection, uid: uint32(uid)}, nil
+	// ROM 不支持白名单命令时，仍应连接和恢复播放器。
+	keepaliveWarning := ensurePlayerKeepalive(data)
+	return &nativePlayer{UnixConn: connection, uid: uint32(uid), pid: int(peer.Pid), keepaliveWarning: keepaliveWarning}, nil
+}
+
+func (p *nativePlayer) PID() int { return p.pid }
+
+func (p *nativePlayer) KeepAlive() error {
+	return errors.Join(p.keepaliveWarning, protectPlayerProcess(p.pid, p.uid))
+}
+
+// 先固定 proc 目录再校验身份，避免 PID 重用时误改其他进程。
+func protectPlayerProcess(pid int, uid uint32) error {
+	if pid <= 1 || uid < 10000 {
+		return errors.New("播放器进程身份无效")
+	}
+	directory, err := os.Open(fmt.Sprintf("/proc/%d", pid))
+	if err != nil {
+		return err
+	}
+	defer directory.Close()
+	read := func(name string) ([]byte, error) {
+		fd, err := syscall.Openat(int(directory.Fd()), name, syscall.O_RDONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
+		if err != nil {
+			return nil, err
+		}
+		file := os.NewFile(uintptr(fd), name)
+		defer file.Close()
+		return io.ReadAll(io.LimitReader(file, 65536))
+	}
+	status, err := read("status")
+	if err != nil {
+		return err
+	}
+	cmdline, err := read("cmdline")
+	if err != nil {
+		return err
+	}
+	if !isPlayerProcess(string(status), string(cmdline), uid) {
+		return errors.New("拒绝修改其他应用的进程优先级")
+	}
+	score, err := read("oom_score_adj")
+	if err != nil {
+		return err
+	}
+	current, err := strconv.Atoi(strings.TrimSpace(string(score)))
+	if err != nil {
+		return err
+	}
+	if current <= -700 {
+		return nil
+	}
+	fd, err := syscall.Openat(int(directory.Fd()), "oom_score_adj", syscall.O_WRONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return err
+	}
+	file := os.NewFile(uintptr(fd), "oom_score_adj")
+	defer file.Close()
+	_, err = file.WriteString("-700\n")
+	return err
+}
+
+func (p *nativePlayer) DisconnectLog() string {
+	text, err := commandOutput("/system/bin/logcat", "-d", "-b", "crash", "--pid", strconv.Itoa(p.pid), "-t", "40")
+	if err != nil || !strings.Contains(text, packageName) {
+		return ""
+	}
+	return fmt.Sprintf("播放器崩溃记录 PID=%d：%s", p.pid, text)
 }
 func listenControl(path string) (net.Listener, error) {
 	if info, err := os.Lstat(path); err == nil {
