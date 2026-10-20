@@ -9,6 +9,7 @@
 | AndroidX Media3 1.8.1 | 原生媒体播放与媒体会话 | Apache-2.0 |
 | Kotlin 标准库 | 播放 APK | Apache-2.0 |
 | Vue、Naive UI | 模块管理页面 | MIT |
+| core-js | 旧 WebView 标准内置函数兼容 | MIT |
 
 Android SDK、JDK、Gradle、Node.js 和 Go 编译器仅用于构建，不将其安装包分发到手机。模块不包含 Windows mpv、NSSM 或 Node.js 运行时。
 
@@ -20,3 +21,4 @@ Android SDK、JDK、Gradle、Node.js 和 Go 编译器仅用于构建，不将其
 - https://github.com/JetBrains/kotlin/blob/master/license/LICENSE.txt
 - https://github.com/vuejs/core/blob/main/LICENSE
 - https://github.com/tusen-ai/naive-ui/blob/main/LICENSE
+- https://github.com/zloirock/core-js/blob/master/LICENSE
