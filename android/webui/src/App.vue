@@ -40,7 +40,7 @@ onMounted(() => { void refresh(); timer = setInterval(refresh, 2000); }); onUnmo
 <template>
   <n-config-provider :theme="darkTheme" :theme-overrides="{ common: { primaryColor: '#b6a7ff', primaryColorHover: '#cec3ff', borderRadius: '16px', cardColor: '#1b2032' } }">
     <main>
-      <header><div class="mark">鳴</div><div><small>ANDROID AGENT</small><h1>凤凰鸣</h1><p>SukiSU 控制台</p></div><n-tag :type="state.authorized ? 'success' : 'warning'" round>{{ state.authorized ? '后端已连接' : '等待连接' }}</n-tag></header>
+      <header><div class="mark">鳴</div><div><small>ANDROID AGENT</small><h1>凤凰鸣</h1><p>本机控制台</p></div><n-tag :type="state.authorized ? 'success' : 'warning'" round>{{ state.authorized ? '后端已连接' : '等待连接' }}</n-tag></header>
       <section class="brake" :class="{ locked: state.emergencyStopped }"><div><strong>{{ state.emergencyStopped ? '紧急制动已锁定' : '本机紧急制动' }}</strong><p>{{ state.emergencyStopped ? '重启后仍保持；解除不会重播旧歌曲' : '立即停止播放，并禁止后续歌曲' }}</p></div><n-button v-if="state.emergencyStopped" type="warning" @click="act({action:'release'})">解除制动</n-button><n-button v-else type="error" @click="act({action:'brake'})">立即制动</n-button></section>
       <p v-if="error" class="notice error">{{ error }}</p><p v-if="message" class="notice">{{ message }}</p>
       <n-tabs type="segment" animated>

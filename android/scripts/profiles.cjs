@@ -2,7 +2,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const profiles = {
   modern: { id: 'modern', version: '0.2.0-android.6', versionCode: 20006, minApi: 29, android: '10', directory: '../release/android' },
-  android9: { id: 'android9', version: '0.2.0-android9.1', versionCode: 20007, minApi: 28, android: '9', directory: '../release/android/android9' },
+  android9: { id: 'android9', version: '0.2.0-android9.2', versionCode: 20008, minApi: 28, android: '9', directory: '../release/android/android9' },
 };
 function getProfile(args = process.argv.slice(2)) {
   const unknown = args.find(value => value !== '--android9');

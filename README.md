@@ -6,6 +6,8 @@ Android 10+ ARM64 的 SukiSU / KernelSU 模块位于 [android](android/README.md
 
 EMUI 9 / Android 9 另有 [Android 9 兼容版](android/ANDROID9.md)，使用 API 28 播放器和守护、旧 WebView 兼容构建，产物与常规版分开保存。
 
+模块更新一直不能生效时，可使用 [独立 SH 安装](android/STANDALONE.md)：程序放在 `/data`，手机浏览器提供本机控制台，无需修改 `/system`。
+
 Windows 10/11 x64 使用发行包 `fenghuangming-agent-windows-x64-v0.1.4.zip`，解压即可。已内置运行时、mpv、NSSM 和桌面控制台，播放电脑无需安装 Node.js、npm 或其他组件。
 
 ## 安装

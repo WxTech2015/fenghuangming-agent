@@ -4,6 +4,8 @@
 
 Android 9 / EMUI 9 使用独立的 [Android 9 兼容版](ANDROID9.md)，不能安装常规版 ZIP。两个构建共享控制协议、保活和制动逻辑，分别校验最低 API、APK 版本、守护 ELF 编译标记及安装门槛。
 
+另提供 [独立 SH 安装](STANDALONE.md)，适用于模块更新流程无法正常完成的环境。无需写入 `/system`，使用手机浏览器打开真实本机控制台。
+
 ## 安装和首次连接
 
 在 SukiSU 管理器中安装 `fenghuangming-agent-sukisu-arm64-0.2.0-android.6.zip` 并重启。模块等待系统就绪后安装自己的播放 APK、启动守护进程。打开模块 WebUI 的「设置」，填写凤凰鸣后端根地址和后台注册设备时生成的凭证，保存后手动解除制动。

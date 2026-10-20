@@ -1,4 +1,18 @@
 const control = '/data/adb/modules/fenghuangming_agent/scripts/ctl.sh';
+const standalone = typeof window !== 'undefined' && !('ksu' in window) && location.origin === 'http://127.0.0.1:17789';
+if (standalone && location.hash) {
+  const key = new URLSearchParams(location.hash.slice(1)).get('key');
+  if (key && /^[a-f0-9]{64}$/.test(key)) sessionStorage.setItem('fhm-console-key', key);
+  history.replaceState(null, '', location.pathname);
+}
+async function local<T>(route: string, payload: unknown): Promise<T> {
+  const response = await fetch('/api/' + route, { method: 'POST', credentials: 'omit', headers: {
+    'Content-Type': 'application/json', Authorization: 'Bearer ' + (sessionStorage.getItem('fhm-console-key') || '')
+  }, body: JSON.stringify(payload) });
+  const value = await response.json();
+  if (!response.ok || value.ok === false) throw new Error(value.error || '本机管理操作失败');
+  return value;
+}
 export function encodeRequest(value: unknown): string {
   const bytes = new TextEncoder().encode(JSON.stringify(value));
   if (bytes.length > 16000) throw new Error('配置内容过大');
@@ -22,11 +36,13 @@ async function command(text: string): Promise<string> {
   });
 }
 export async function request<T = Record<string, unknown>>(payload: unknown): Promise<T> {
+  if (standalone) return local<T>('request', payload);
   const output = await command(`${control} request ${encodeRequest(payload)}`);
   const value = JSON.parse(output.trim());
   if (value.ok === false) throw new Error(value.error || '操作失败');
   return value;
 }
 export async function service(action: 'start' | 'stop' | 'install'): Promise<void> {
+  if (standalone) { await local('service', { action }); return; }
   await command(`${control} ${action}`);
 }
