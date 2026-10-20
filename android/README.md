@@ -2,6 +2,8 @@
 
 适用于 SukiSU / KernelSU 的 Android 10+ ARM64 播放端，包含 Go 守护程序、Android Media3 原生播放器与 Vue 模块 WebUI。当前为 `0.2.0-android.6` 预览版，尚未完成华为 Mate 实机验证。
 
+Android 9 / EMUI 9 使用独立的 [Android 9 兼容版](ANDROID9.md)，不能安装常规版 ZIP。两个构建共享控制协议、保活和制动逻辑，分别校验最低 API、APK 版本、守护 ELF 编译标记及安装门槛。
+
 ## 安装和首次连接
 
 在 SukiSU 管理器中安装 `fenghuangming-agent-sukisu-arm64-0.2.0-android.6.zip` 并重启。模块等待系统就绪后安装自己的播放 APK、启动守护进程。打开模块 WebUI 的「设置」，填写凤凰鸣后端根地址和后台注册设备时生成的凭证，保存后手动解除制动。
@@ -45,9 +47,10 @@ APK 签名私钥与密码位于 `android/.signing/`，务必备份，不要上�
 
 Go 程序在 `android/daemon` 运行 `go test ./...`。发行构建使用 `GOOS=android GOARCH=arm64 CGO_ENABLED=1`、NDK 的 API 29 编译器及 PIE 模式，输出到 `release/android/fhm-agent`。程序使用手机自带的 Android 链接器和 Bionic，域名解析交给系统，不使用普通 Linux 静态二进制的 DNS 假设。
 
-在 `android/webui` 执行 `npm ci --include=dev`、`npm run build` 和 `npm test`，之后从 Agent 仓库根目录执行：
+在 `android/webui` 执行 `npm ci --include=dev` 和 `npm test`，之后从 Agent 仓库根目录执行：
 
 ```powershell
+node android/scripts/build-webui.cjs
 node android/scripts/package.cjs
 ```
 

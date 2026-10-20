@@ -9,6 +9,7 @@ const options = new Map();
 for (let i = 2; i < process.argv.length; i += 2)
     options.set(process.argv[i], process.argv[i + 1]);
 const adb = options.get('--adb') || 'adb', serial = options.get('--serial'), binary = options.get('--daemon');
+const apk = path.resolve(options.get('--apk') || path.join(root, 'android/player/build/outputs/apk/release/player-release.apk'));
 if (!serial || !binary) {
     console.error('仅在隔离模拟器运行：node android/tests/emulator-smoke.cjs --serial <ADB设备> --daemon <同架构守护程序> [--adb <adb路径>]');
     process.exit(2);
@@ -19,7 +20,10 @@ const port = Number(options.get('--port') || 5193);
 const token = 'emulator-smoke-only-token';
 const report = { steps: [], messages: [] };
 function call(...args) { return execFileSync(adb, ['-s', serial, ...args], { encoding: 'utf8', timeout: 20000, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] }).trim(); }
-function shell(text) { return call('shell', 'su', '-c', "'" + text.replaceAll("'", "'\\''") + "'"); }
+function shell(text) {
+    const quoted = "'" + text.replaceAll("'", "'\\''") + "'";
+    return options.get('--root-mode') === 'adb' ? call('shell', 'sh -c ' + quoted) : call('shell', 'su', '-c', quoted);
+}
 function ctl(value) { return JSON.parse(shell(dir + '/fhm-agent --data ' + dir + '/data --request ' + Buffer.from(JSON.stringify(value)).toString('base64'))); }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function until(label, predicate, timeout = 15000) { const start = Date.now(); while (Date.now() - start < timeout) {
@@ -40,6 +44,7 @@ async function main() {
     report.android = call('shell', 'getprop', 'ro.build.version.release');
     report.abi = call('shell', 'getprop', 'ro.product.cpu.abilist');
     report.selinux = call('shell', 'getenforce');
+    if (options.get('--root-mode') === 'adb' && call('shell', 'id', '-u') !== '0') throw Error('该模式仅用于 adb root 的隔离测试镜像');
     if (!report.abi.split(',').includes('x86_64'))
         throw Error('该脚本只用于隔离 x86_64 Android 模拟器');
     server = http.createServer((req, res) => { if (req.headers.authorization !== 'Bearer ' + token) {
@@ -71,11 +76,11 @@ async function main() {
     shell('chown 2000:2000 ' + dir + ' ' + dir + '/module/assets');
     shell('chmod 700 ' + dir + '/data');
     call('push', path.resolve(binary), dir + '/fhm-agent');
-    call('push', path.join(root, 'android/player/build/outputs/apk/release/player-release.apk'), dir + '/module/assets/player.apk');
+    call('push', apk, dir + '/module/assets/player.apk');
     shell('chmod 755 ' + dir + '/fhm-agent');
     shell('chown 0:0 ' + dir + ' ' + dir + '/module/assets');
     shell('chmod 700 ' + dir);
-    const apkHash = crypto.createHash('sha256').update(fs.readFileSync(path.join(root, 'android/player/build/outputs/apk/release/player-release.apk'))).digest('hex');
+    const apkHash = crypto.createHash('sha256').update(fs.readFileSync(apk)).digest('hex');
     shell("echo '" + apkHash + "' > " + dir + '/module/assets/player.sha256');
     console.log(shell(dir + '/fhm-agent --data ' + dir + '/data --module ' + dir + '/module --install-player'));
     const config = Buffer.from(JSON.stringify({ serverUrl: 'http://127.0.0.1:' + port, token, cacheMaxMb: 100, connections: 4 })).toString('base64');

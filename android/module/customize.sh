@@ -1,6 +1,8 @@
 #!/system/bin/sh
 [ "$KSU" = "true" ] || abort "请通过 SukiSU / KernelSU 管理器安装"
-[ "$API" -ge 29 ] || abort "需要 Android 10 或更新版本"
+MIN_API=29
+MIN_ANDROID=10
+[ "$API" -ge "$MIN_API" ] || abort "需要 Android $MIN_ANDROID 或更新版本"
 [ "$ARCH" = "arm64" ] || abort "当前版本仅支持 ARM64"
 DATA=/data/adb/fenghuangming
 [ ! -L "$DATA" ] || abort "数据目录不能是符号链接"

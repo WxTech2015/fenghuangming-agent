@@ -4,6 +4,8 @@
 
 Android 10+ ARM64 的 SukiSU / KernelSU 模块位于 [android](android/README.md)，使用原生 Media3 播放和模块 WebUI。当前为 `0.2.0-android.6` 测试预览；已用 x86_64 测试包完成 MuMu 中的真实 KernelSU 安装、重启、后台播放与进程恢复验证，ARM64 手机仍未实测。以下为 Windows 安装说明。
 
+EMUI 9 / Android 9 另有 [Android 9 兼容版](android/ANDROID9.md)，使用 API 28 播放器和守护、旧 WebView 兼容构建，产物与常规版分开保存。
+
 Windows 10/11 x64 使用发行包 `fenghuangming-agent-windows-x64-v0.1.4.zip`，解压即可。已内置运行时、mpv、NSSM 和桌面控制台，播放电脑无需安装 Node.js、npm 或其他组件。
 
 ## 安装

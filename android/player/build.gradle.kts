@@ -6,10 +6,10 @@ android {
     buildToolsVersion = "36.1.0"
     defaultConfig {
         applicationId = "com.phoring.fenghuangming.player"
-        minSdk = 29
+        minSdk = providers.gradleProperty("fhmMinApi").map(String::toInt).getOrElse(29)
         targetSdk = 36
-        versionCode = 20006
-        versionName = "0.2.0-android.6"
+        versionCode = providers.gradleProperty("fhmVersionCode").map(String::toInt).getOrElse(20006)
+        versionName = providers.gradleProperty("fhmVersion").getOrElse("0.2.0-android.6")
     }
     signingConfigs {
         create("module") {

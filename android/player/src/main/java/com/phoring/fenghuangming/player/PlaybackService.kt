@@ -154,10 +154,14 @@ class PlaybackService : MediaSessionService() {
             .setContentTitle("凤凰鸣 · $title").setContentText(text).setContentIntent(open).setOngoing(true)
             .addAction(Notification.Action.Builder(null, "停止播放", stop).build()).build()
         try {
-            val type = if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
-                (if (gate.playbackId != null) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0)
-            else ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-            startForeground(2001, notification, type)
+            if (Build.VERSION.SDK_INT >= 29) {
+                val type = if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
+                    (if (gate.playbackId != null) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0)
+                else ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                startForeground(2001, notification, type)
+            } else {
+                startForeground(2001, notification)
+            }
             foregroundReady = true
         } catch (error: Exception) {
             foregroundReady = false
